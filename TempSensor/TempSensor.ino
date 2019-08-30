@@ -17,5 +17,6 @@ void loop() {
   StaticJsonDocument<capacity> doc;
   doc["humidity"] = dht.readHumidity();
   doc["temperature"] = dht.readTemperature();
+  Serial.write(measureJson(doc));
   serializeJson(doc, Serial);
 }

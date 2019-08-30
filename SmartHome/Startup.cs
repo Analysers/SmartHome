@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using SmartHome.Services;
 
 namespace SmartHome
 {
@@ -24,18 +21,23 @@ namespace SmartHome
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddDbContext<Database>(options => options.UseSqlite("Data Source=data.db"));
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            var dbOptionsBuilder = new DbContextOptionsBuilder<Database>();
+            dbOptionsBuilder.UseSqlite("Data Source=data.db");
+            services.AddSingleton<ITempSensor>(provider => new TempSensor(provider.GetService<IConfiguration>(),
+                provider.GetService<ILogger<TempSensor>>(), dbOptionsBuilder.Options));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public async void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
+            if (env.IsDevelopment()) app.UseDeveloperExceptionPage();
 
             app.UseMvc();
+
+            await app.ApplicationServices.GetService<ITempSensor>().StartServiceAsync();
         }
     }
 }
