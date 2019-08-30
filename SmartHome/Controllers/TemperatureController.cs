@@ -22,7 +22,7 @@ namespace SmartHome.Controllers
         [HttpGet]
         public async Task<ActionResult<Temperature>> GetTemperature()
         {
-            return await _context.Temperature.LastAsync();
+            return await _context.Temperature.OrderByDescending(t => t.Time).FirstAsync();
         }
 
         // GET: api/Temperature/5

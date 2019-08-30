@@ -22,7 +22,7 @@ namespace SmartHome.Controllers
         [HttpGet]
         public async Task<ActionResult<Humidity>> GetHumidity()
         {
-            return await _context.Humidity.LastAsync();
+            return await _context.Humidity.OrderByDescending(t=>t.Time).FirstAsync();
         }
 
         // GET: api/Humidity/5
