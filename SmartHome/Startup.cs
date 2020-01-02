@@ -26,18 +26,30 @@ namespace SmartHome
 
             var dbOptionsBuilder = new DbContextOptionsBuilder<Database>();
             dbOptionsBuilder.UseSqlite("Data Source=data.db");
+
             services.AddSingleton<ITempSensor>(provider => new TempSensor(provider.GetService<IConfiguration>(),
                 provider.GetService<ILogger<TempSensor>>(), dbOptionsBuilder.Options));
+
+            if (Configuration["Telegram:Enabled"].ToLower() == "true")
+            {
+                services.AddSingleton<ITelegramBot>(provider => new TelegramBot(provider.GetService<IConfiguration>(),
+                    provider.GetService<ILogger<TelegramBot>>(), dbOptionsBuilder.Options));
+            }
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public async void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
             if (env.IsDevelopment()) app.UseDeveloperExceptionPage();
 
             app.UseMvc();
 
-            await app.ApplicationServices.GetService<ITempSensor>().StartServiceAsync();
+            app.ApplicationServices.GetService<ITempSensor>().StartService();
+
+            if (Configuration["Telegram:Enabled"].ToLower() == "true")
+            {
+                app.ApplicationServices.GetService<ITelegramBot>().StartService();
+            }
         }
     }
 }

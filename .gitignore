@@ -4,6 +4,7 @@
 data.db
 .pio
 .vscode
+appsettings.Production.json
 
 # User-specific files
 *.suo
