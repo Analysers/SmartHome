@@ -14,7 +14,7 @@ namespace SmartHome.Services
 {
     public interface ITempSensor
     {
-        Task StartServiceAsync();
+        void StartService(CancellationToken cancellationToken = default);
     }
 
     public class TempSensor : ITempSensor, IDisposable
@@ -32,7 +32,6 @@ namespace SmartHome.Services
         private IConfiguration Configuration { get; }
         private DbContextOptions<Database> DbOptions { get; }
         private ILogger<TempSensor> Logger { get; }
-        private CancellationTokenSource CancellationTokenSource { get; set; }
         private HttpClient HttpClient { get; } = new HttpClient();
         private MulticastService MDNS { get; }
         private ServiceDiscovery ServiceDiscovery { get; }
@@ -40,21 +39,14 @@ namespace SmartHome.Services
 
         public void Dispose()
         {
-            CancellationTokenSource?.Dispose();
             HttpClient?.Dispose();
             MDNS?.Dispose();
             ServiceDiscovery?.Dispose();
         }
 
-        public async Task StartServiceAsync()
+        public void StartService(CancellationToken cancellationToken = default)
         {
-            if (CancellationTokenSource != null && !CancellationTokenSource.IsCancellationRequested)
-                return;
-            CancellationTokenSource?.Dispose();
-            CancellationTokenSource = new CancellationTokenSource();
-            var cancellationToken = CancellationTokenSource.Token;
-
-            await Task.Run(async () =>
+            Task.Run(async () =>
             {
                 try
                 {
@@ -103,9 +95,9 @@ namespace SmartHome.Services
                         }
                     }
                 }
-                finally
+                catch (Exception e)
                 {
-                    CancellationTokenSource.Cancel();
+                    Logger.LogCritical(e, "Unexpected error");
                 }
             }, cancellationToken);
         }
