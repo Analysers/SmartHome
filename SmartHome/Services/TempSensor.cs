@@ -76,9 +76,16 @@ namespace SmartHome.Services
                                     await database.SaveChangesAsync(cancellationToken);
                                 }
                             }
+                            catch (UriFormatException e)
+                            {
+                                Logger.LogWarning(e, "Failed to get response; resetting hostname");
+                                HostName = "";
+                                break;
+                            }
                             catch (HttpRequestException e)
                             {
                                 Logger.LogWarning(e, "Failed to get response; resetting hostname");
+                                HostName = "";
                                 break;
                             }
                             catch (Exception e)
