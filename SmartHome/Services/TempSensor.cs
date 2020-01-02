@@ -27,7 +27,6 @@ namespace SmartHome.Services
             DbOptions = dbOptions;
             MDNS = new MulticastService();
             ServiceDiscovery = new ServiceDiscovery(MDNS);
-            MDNS.Start();
         }
 
         private IConfiguration Configuration { get; }
@@ -59,6 +58,7 @@ namespace SmartHome.Services
             {
                 try
                 {
+                    MDNS.Start();
                     while (true)
                     {
                         SetupServiceDiscovery("_tempsensor._tcp.local");
