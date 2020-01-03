@@ -45,7 +45,11 @@ namespace SmartHome.Services
         public EventProxy<IPAddressEventArgs> DiscoverService(string serviceName)
         {
             MDNS.SendQuery(serviceName, type: DnsType.PTR);
-            EventDictionary.TryAdd(serviceName, new EventProxy<IPAddressEventArgs>());
+            lock (_dictLock)
+            {
+                EventDictionary.TryAdd(serviceName, new EventProxy<IPAddressEventArgs>());
+            }
+
             return EventDictionary[serviceName];
         }
 
