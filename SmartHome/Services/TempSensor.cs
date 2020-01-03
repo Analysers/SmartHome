@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using Makaretu.Dns;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -20,28 +18,23 @@ namespace SmartHome.Services
     public class TempSensor : ITempSensor, IDisposable
     {
         public TempSensor(IConfiguration configuration, ILogger<TempSensor> logger,
-            DbContextOptions<Database> dbOptions)
+            DbContextOptions<Database> dbOptions, IServiceDiscovery serviceDiscovery)
         {
             Configuration = configuration;
             Logger = logger;
             DbOptions = dbOptions;
-            MDNS = new MulticastService();
-            ServiceDiscovery = new ServiceDiscovery(MDNS);
+            ServiceDiscovery = serviceDiscovery;
         }
 
         private IConfiguration Configuration { get; }
         private DbContextOptions<Database> DbOptions { get; }
         private ILogger<TempSensor> Logger { get; }
+        private IServiceDiscovery ServiceDiscovery { get; }
         private HttpClient HttpClient { get; } = new HttpClient();
-        private MulticastService MDNS { get; }
-        private ServiceDiscovery ServiceDiscovery { get; }
-        private string HostName { get; set; }
 
         public void Dispose()
         {
             HttpClient?.Dispose();
-            MDNS?.Dispose();
-            ServiceDiscovery?.Dispose();
         }
 
         public void StartService(CancellationToken cancellationToken = default)
@@ -50,11 +43,12 @@ namespace SmartHome.Services
             {
                 try
                 {
-                    MDNS.Start();
+                    var hostName = "";
                     while (true)
                     {
-                        SetupServiceDiscovery("_tempsensor._tcp.local");
-                        while (string.IsNullOrEmpty(HostName)) await Task.Delay(1000, cancellationToken);
+                        var discoverEvent = ServiceDiscovery.DiscoverService("_tempsensor._tcp.local");
+                        discoverEvent += (sender, e) => hostName = e.IPAddress.ToString();
+                        while (string.IsNullOrEmpty(hostName)) await Task.Delay(1000, cancellationToken);
 
                         if (cancellationToken.IsCancellationRequested)
                             break;
@@ -63,7 +57,7 @@ namespace SmartHome.Services
                         {
                             try
                             {
-                                var jsonString = await HttpClient.GetStringAsync($"http://{HostName}/sensor");
+                                var jsonString = await HttpClient.GetStringAsync($"http://{hostName}/sensor");
                                 var json = JObject.Parse(jsonString);
                                 Logger.LogDebug(json.ToString());
 
@@ -76,21 +70,30 @@ namespace SmartHome.Services
                                     await database.SaveChangesAsync(cancellationToken);
                                 }
                             }
-                            catch (UriFormatException e)
-                            {
-                                Logger.LogWarning(e, "Failed to get response; resetting hostname");
-                                HostName = "";
-                                break;
-                            }
-                            catch (HttpRequestException e)
-                            {
-                                Logger.LogWarning(e, "Failed to get response; resetting hostname");
-                                HostName = "";
-                                break;
-                            }
                             catch (Exception e)
                             {
-                                Logger.LogWarning(e, "Failed to fetch sensor data");
+                                var resetHost = false;
+                                switch (e)
+                                {
+                                    case UriFormatException _:
+                                        Logger.LogWarning(e,
+                                            $"Invalid Url http://{hostName}/sensor; Resetting hostname");
+                                        resetHost = true;
+                                        break;
+                                    case HttpRequestException _:
+                                        Logger.LogWarning(e, "Failed to get response; Resetting hostname");
+                                        resetHost = true;
+                                        break;
+                                    default:
+                                        Logger.LogWarning(e, "Failed to fetch sensor data");
+                                        break;
+                                }
+
+                                if (resetHost)
+                                {
+                                    hostName = "";
+                                    break;
+                                }
                             }
                             finally
                             {
@@ -107,28 +110,6 @@ namespace SmartHome.Services
                     Logger.LogCritical(e, "Unexpected error");
                 }
             }, cancellationToken);
-        }
-
-        public void SetupServiceDiscovery(string serviceName)
-        {
-            MDNS.SendQuery(serviceName, type: DnsType.PTR);
-
-            ServiceDiscovery.ServiceInstanceDiscovered += (s, e) =>
-            {
-                MDNS.SendQuery(e.ServiceInstanceName, type: DnsType.SRV);
-            };
-
-            MDNS.AnswerReceived += (s, e) =>
-            {
-                var servers = e.Message.Answers.OfType<SRVRecord>();
-                foreach (var server in servers) MDNS.SendQuery(server.Target, type: DnsType.A);
-                var addresses = e.Message.Answers.OfType<AddressRecord>();
-                foreach (var address in addresses)
-                {
-                    HostName = address.Address.ToString();
-                    Logger.LogDebug($"Find service instance host: {HostName}");
-                }
-            };
         }
     }
 }

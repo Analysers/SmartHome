@@ -27,8 +27,10 @@ namespace SmartHome
             var dbOptionsBuilder = new DbContextOptionsBuilder<Database>();
             dbOptionsBuilder.UseSqlite("Data Source=data.db");
 
+            services.AddSingleton<IServiceDiscovery>(provider => new ServiceDiscovery(provider.GetService<ILogger<ServiceDiscovery>>()));
+
             services.AddSingleton<ITempSensor>(provider => new TempSensor(provider.GetService<IConfiguration>(),
-                provider.GetService<ILogger<TempSensor>>(), dbOptionsBuilder.Options));
+                provider.GetService<ILogger<TempSensor>>(), dbOptionsBuilder.Options, provider.GetService<IServiceDiscovery>()));
 
             if (Configuration["Telegram:Enabled"].ToLower() == "true")
             {
@@ -43,6 +45,8 @@ namespace SmartHome
             if (env.IsDevelopment()) app.UseDeveloperExceptionPage();
 
             app.UseMvc();
+
+            app.ApplicationServices.GetService<IServiceDiscovery>().StartService();
 
             app.ApplicationServices.GetService<ITempSensor>().StartService();
 
