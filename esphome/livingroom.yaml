@@ -1,0 +1,36 @@
+esphome:
+  name: temperature_sensor
+  platform: ESP32
+  board: nodemcu-32s
+
+wifi:
+  ssid: "yourssid"
+  password: "yourssidpass"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Temperature sensor Fallback"
+    password: "asdasdasdafsdfsd"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+web_server:
+  port: 80
+
+sensor:
+  - platform: dht
+    pin: GPIO25
+    temperature:
+      name: "Temperature"
+    humidity:
+      name: "Humidity"
+    model: DHT22
+    update_interval: 30s
